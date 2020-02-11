@@ -1,3 +1,25 @@
+/*
+ * ROS Node for using a wiimote control unit to direct a robot.
+ * Copyright (c) 2020, Alberto Tudela.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ */
+
+/*
+ * Initial C++ implementation by
+ *  Alberto Tudela <ajtudela@gmail.com>
+ *
+ * Revisions:
+ *
+ */
+ 
 #include "xwiimote_controller/xwiimote_controller.h"
 #include "xwiimote_controller/State.h"
 #include "xwiimote_controller/IrSourceInfo.h"

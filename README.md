@@ -38,6 +38,11 @@ Add current user to group "input"
 $ sudo usermod -aG input $USER
 ```
 
+Or install udev rules:
+```bash
+$ sudo cp /rules/wiimote.rules /etc/udev/rules.d/
+```
+
 Pair your Wiimote with your computer
 using `blueman` (Bluetooth device manager) and connect to HID:
 

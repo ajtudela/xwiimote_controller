@@ -434,7 +434,7 @@ void WiimoteNode::setRumble(double duration){
 void WiimoteNode::readLed(){
 	bool stateLed;
 	for(int i = 0; i < 4; i++){
-		unsigned int ret = xwii_iface_get_led(iface_, i+1, &stateLed);
+		unsigned int ret = xwii_iface_get_led(iface_, XWII_LED(i+1), &stateLed);
 		leds_[i] = stateLed;
 		if (ret) {
 			ROS_ERROR("Error: Cannot read leds %d", ret);
@@ -453,11 +453,11 @@ void WiimoteNode::readBattery(){
 }
 
 /* Set Leds */
-void WiimoteNode::setLed(unsigned int led_idx, bool on){
-	ROS_INFO_THROTTLE(1, "led(led #%i: %i)", led_idx, on);
-	unsigned int ret = xwii_iface_set_led(iface_, XWII_LED(led_idx), on);
+void WiimoteNode::setLed(unsigned int ledIdx, bool on){
+	ROS_INFO_THROTTLE(1, "led(led #%i: %i)", XWII_LED(ledIdx+1), on);
+	unsigned int ret = xwii_iface_set_led(iface_, XWII_LED(ledIdx+1),on);
 	if (ret) {
-		ROS_ERROR("Error: Cannot toggle led #%i: %d", led_idx, ret);
+		ROS_ERROR("Error: Cannot set led #%i: %d", XWII_LED(ledIdx+1), ret);
 	}
 }
 

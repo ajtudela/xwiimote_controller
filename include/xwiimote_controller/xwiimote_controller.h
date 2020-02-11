@@ -62,7 +62,7 @@ private:
 	void readLed();
 	void readBattery();
 	void toggleRumble(bool on);
-	void setLed(unsigned int led_idx, bool on);
+	void setLed(unsigned int ledIdx, bool on);
 	void setRumble(double duration);
 	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);	
 	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);

@@ -462,10 +462,6 @@ void WiimoteNode::publishState(){
 }
 
 int main(int argc, char **argv) {
-	int deviceIdx_;
-	std::string devicePath_;
-	static struct xwii_iface *iface_;	
-	
 	ros::init(argc, argv, "xwiimote");
 	ros::NodeHandle node("");
 	ros::NodeHandle node_private("~");  

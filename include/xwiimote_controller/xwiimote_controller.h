@@ -43,7 +43,7 @@ public:
 private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
-	ros::Publisher wiimoteStatePub_;
+	ros::Publisher wiimoteStatePub_, joyPub_;
 	ros::Subscriber rumbleSub_;
 	ros::Time rumbleEnd_;
 	

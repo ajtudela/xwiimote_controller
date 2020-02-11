@@ -26,13 +26,16 @@
 
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float32.h"
+#include "sensor_msgs/Joy.h"
 #include <string>
 
 /* Initialize the subscribers and publishers */
 WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){	
 	paramsSrv_ = nodePrivate_.advertiseService("params", &WiimoteNode::updateParams, this);
 	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1);
-	rumbleSub_ = nodePrivate_.subscribe("/rumble", 10, &WiimoteNode::rumbleCallback, this);	
+	joyPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/joy", 1);
+	
+	joySetFeedbackSub_ = nodePrivate_.subscribe<sensor_msgs::JoyFeedbackArray>("/joy/set_feedback", 10, &WiimoteNode::joySetFeedbackCallback, this);
 	
 	initializeWiimoteState();	
 }
@@ -361,7 +364,8 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		// Check Battery
 		readBattery();
 		
-		if(needPub) {			
+		if(needPub) {
+			publishJoy();		
 			publishState();
 		}
 		
@@ -380,10 +384,40 @@ void WiimoteNode::toggleRumble(bool on){
 	}
 }
 
+/* Set rumble and leds */
+void WiimoteNode::joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback){
+	for (std::vector<sensor_msgs::JoyFeedback>::const_iterator it = feedback->array.begin(); it != feedback->array.end(); ++it){
+		if ((*it).type == sensor_msgs::JoyFeedback::TYPE_LED){
+			if((*it).intensity >= 0.5){
+				if ((*it).id > 3){
+					ROS_WARN("LED ID %d out of bounds; ignoring!", (*it).id);
+				}else{	
+					setLed((*it).id, true);
+				}
+			}else{
+				if ((*it).id > 3){
+					ROS_WARN("LED ID %d out of bounds; ignoring!", (*it).id);
+				}else{	
+					setLed((*it).id, false);
+				}
+			}
+		}else if((*it).type == sensor_msgs::JoyFeedback::TYPE_RUMBLE){
+			if ((*it).id > 0){
+				ROS_WARN("RUMBLE ID %d out of bounds; ignoring!", (*it).id);
+			}else{
+				if((*it).intensity > 0){
+					setRumble((*it).intensity);
+				}
+			}
+		}else{
+			ROS_WARN("Unknown JoyFeedback command; ignored");
+		}
+	}
+}
+
 /* Set rumble for duration in seconds */
-void WiimoteNode::rumbleCallback(const std_msgs::Float32::ConstPtr& message){
+void WiimoteNode::setRumble(double duration){
 	// compute rumbleEnd
-	double duration = message->data;
 	if(duration < 1E-2){
 		duration = 1E-2;
 	}else if (duration > 10){
@@ -427,7 +461,24 @@ void WiimoteNode::setLed(unsigned int led_idx, bool on){
 	}
 }
 
-/* Publish all */
+/* Publish joy */
+void WiimoteNode::publishJoy(){
+	sensor_msgs::Joy joyData;
+
+	joyData.header.stamp = ros::Time::now();
+	
+	for(int i = 0; i < 11; i++){
+		joyData.axes.push_back(nunchuckAcceleration_[i]);
+	}
+	
+	for(int i = 0; i < 11; i++){
+		joyData.buttons.push_back(buttons_[i]);
+	}
+
+	joyPub_.publish(joyData);
+}
+
+/* Publish state */
 void WiimoteNode::publishState(){
 	xwiimote_controller::State state;
 	state.header.stamp = ros::Time::now();

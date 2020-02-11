@@ -176,17 +176,20 @@ Parameters
 Subscriptions
 -------------
 
- * ```~rumble```
-  [std_msgs/Float32, seconds]
-  Turn the rumble on for a given duration, in seconds.
-  Given durations will be clamped in the (10 ms, 10 s) span.
+ * ```joy/set_feedback```
+  [sensor_msgs::JoyFeedbackArray, seconds]
+  Topic where ROS clients control the Wiimote's leds and rumble (vibrator) facility.
+  You have to build the array in the next way:
+	- Type of the feedback: TYPE_LED = 0 or TYPE_RUMBLE = 1.
+	- Id number for each type of each feedback. The first led would be id = 0. If rumble, id = 0.
+	- Intensity of the feedback. If rumble, intensity is duration in seconds. Given durations will be clamped in the (10 ms, 10 s) span.
 
 Publications
 ------------
 
- * ```~joy```
-  [wiimote/state]
-  Acquired Wiimote state. Including battery percent, led status, acceleration and angular velocity.
+ * ```/wiimote/state```
+  [xwiimote_controller::State]
+  Topic for comprehensive information about Wiimote state. Including battery percent, led status, acceleration and angular velocity.
   List of buttons and axes:
   
   11+2 buttons (O=released, 1=pressed):

@@ -34,6 +34,7 @@ extern "C" {
 #include "ros/ros.h"
 #include "std_srvs/Empty.h"
 #include "std_msgs/Float32.h"
+#include "sensor_msgs/JoyFeedbackArray.h"
 
 class WiimoteNode{
 public:
@@ -44,7 +45,7 @@ private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
 	ros::Publisher wiimoteStatePub_, joyPub_;
-	ros::Subscriber rumbleSub_;
+	ros::Subscriber joySetFeedbackSub_;
 	ros::Time rumbleEnd_;
 	
 	int deviceIdx_;
@@ -56,12 +57,14 @@ private:
 	char *getDevice(int num);
 	bool runInterface(struct xwii_iface *iface);
 	void initializeWiimoteState();
+	void publishJoy();
 	void publishState();
 	void readLed();
 	void readBattery();
 	void toggleRumble(bool on);
 	void setLed(unsigned int led_idx, bool on);
-	void rumbleCallback(const std_msgs::Float32::ConstPtr& message);
+	void setRumble(double duration);
+	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);	
 	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 };
 

@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   std_msgs
   std_srvs
+  sensor_msgs
   geometry_msgs 
   message_generation
 )
@@ -73,6 +74,7 @@ add_message_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
    DEPENDENCIES
+   sensor_msgs
    geometry_msgs
    std_msgs
 )

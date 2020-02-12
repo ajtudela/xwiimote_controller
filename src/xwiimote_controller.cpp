@@ -242,41 +242,41 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 				//ROS_INFO_THROTTLE(1, "XWII_EVENT_NUNCHUK_MOVE:%i, %i", event.v.abs[0].x, event.v.abs[0].y);
 				needPub = true;
 				x = 0.01 * event.v.abs[0].x;
-				if (x < -1)
+				/*if (x < -1)
 					x = -1;
 				else if (x > 1)
-					x = 1;
+					x = 1;*/
 				nunchukJoystick_[0] = x;
 				
 				y = 0.01 * event.v.abs[0].y;
-				if (y < -1)
+				/*if (y < -1)
 					y = -1;
 				else if (y > 1)
-					y = 1;
+					y = 1;*/
 				nunchukJoystick_[1] = y;
 				
 				naccex = event.v.abs[1].x;
-				naccex /= 512;
+				/*naccex /= 512;
 				if (naccex >= 0)
 					naccex = 10 * pow(naccex, 0.25);
 				else
-					accex = -10 * pow(-naccex, 0.25);
+					accex = -10 * pow(-naccex, 0.25);*/
 				nunchuckAcceleration_[0] = naccex;
 				
 				naccey = event.v.abs[1].y;
-				naccey /= 512;
+				/*naccey /= 512;
 				if (naccey >= 0)
 					naccey = 5 * pow(naccey, 0.25);
 				else
-					naccey = -5 * pow(-naccey, 0.25);
+					naccey = -5 * pow(-naccey, 0.25);*/
 				nunchuckAcceleration_[1] = naccey;
 				
 				naccez = event.v.abs[1].z;
-				naccez /= 512;
+				/*naccez /= 512;
 				if (naccez >= 0)
 					naccez = 5 * pow(naccez, 0.25);
 				else
-					naccez = -5 * pow(-naccez, 0.25);
+					naccez = -5 * pow(-naccez, 0.25);*/
 				nunchuckAcceleration_[2] = naccez;				
 				break;
 //#if 0
@@ -287,27 +287,27 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 				//ROS_INFO_THROTTLE(1, "XWII_EVENT_ACCEL");
 				needPub = true;
 				accex = event.v.abs[0].x;
-				accex /= 512;
+				/*accex /= 512;
 				if (accex >= 0)
 					accex = 10 * pow(accex, 0.25);
 				else
-					accex = -10 * pow(-accex, 0.25);
+					accex = -10 * pow(-accex, 0.25);*/
 				acceleration_[0] = accex;
 				
 				accey = event.v.abs[0].y;
-				accey /= 512;
+				/*accey /= 512;
 				if (accey >= 0)
 					accey = 5 * pow(accey, 0.25);
 				else
-					accey = -5 * pow(-accey, 0.25);
+					accey = -5 * pow(-accey, 0.25);*/
 				acceleration_[1] = accey;
 				
 				accez = event.v.abs[0].z;
-				accez /= 512;
+				/*accez /= 512;
 				if (accez >= 0)
 					accez = 5 * pow(accez, 0.25);
 				else
-					accez = -5 * pow(-accez, 0.25);
+					accez = -5 * pow(-accez, 0.25);*/
 				acceleration_[2] = accez;				
 				break;
 			case XWII_EVENT_IR:

@@ -546,8 +546,8 @@ void WiimoteNode::publishWiimoteNunchuk(){
 
 	//calculateJoystickAxisXY(wiimote_state_.ext.nunchuk.stick, nunchuk_stick_min_, nunchuk_stick_max_, nunchuk_stick_center_, stick);
 
-	wiimoteNunchukData.axes.push_back(stick[0]);  // x
-	wiimoteNunchukData.axes.push_back(stick[1]);  // y
+	wiimoteNunchukData.axes.push_back(nunchukJoystick_[0]);  // x
+	wiimoteNunchukData.axes.push_back(nunchukJoystick_[1]);  // y
 
 	wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[0]);
 	wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[1]);

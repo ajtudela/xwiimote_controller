@@ -263,7 +263,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 				else if (y > 1)
 					y = 1;
 				// Create a deadzone in the center
-				if (fabs(y) <= 0.05){
+				if (fabs(y) <= 0.06){
 					nunchukJoystick_[1] = 0.0;
 				}else{
 					nunchukJoystick_[1] = y;

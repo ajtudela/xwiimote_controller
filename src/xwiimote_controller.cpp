@@ -523,36 +523,36 @@ void WiimoteNode::publishWiimoteNunchuk(){
 	sensor_msgs::Joy wiimoteNunchukData;
 	
 	// Is the Nunchuk connected?
-	if(isPresentNunchuk()){
+	if(isPresentNunchuk()){		
 		// Is the Nunchuk publisher not advertised?
 		if(nullptr == wiimoteNunchukPub_){
-			wiimoteNunchukPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/wiimote/nunchuk", 1);
-			
-			wiimoteNunchukData.header.stamp = ros::Time::now();
-
-			// Joy stick
-			double stick[2];
-
-			//calculateJoystickAxisXY(wiimote_state_.ext.nunchuk.stick, nunchuk_stick_min_, nunchuk_stick_max_, nunchuk_stick_center_, stick);
-
-			wiimoteNunchukData.axes.push_back(stick[0]);  // x
-			wiimoteNunchukData.axes.push_back(stick[1]);  // y
-
-			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[0]);
-			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[1]);
-			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[2]);
-
-			wiimoteNunchukData.buttons.push_back(nunchukButtons_[0]);
-			wiimoteNunchukData.buttons.push_back(nunchukButtons_[1]);
-
-			wiimoteNunchukPub_.publish(wiimoteNunchukData);			
+			wiimoteNunchukPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/wiimote/nunchuk", 1);			
 		}
 	}else{
 		// Is the Nunchuk publisher advertised?
 		if(nullptr != wiimoteNunchukPub_){
 			wiimoteNunchukPub_.shutdown();
 		}
-	}	
+	}
+	
+	wiimoteNunchukData.header.stamp = ros::Time::now();
+
+	// Joy stick
+	double stick[2];
+
+	//calculateJoystickAxisXY(wiimote_state_.ext.nunchuk.stick, nunchuk_stick_min_, nunchuk_stick_max_, nunchuk_stick_center_, stick);
+
+	wiimoteNunchukData.axes.push_back(stick[0]);  // x
+	wiimoteNunchukData.axes.push_back(stick[1]);  // y
+
+	wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[0]);
+	wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[1]);
+	wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[2]);
+
+	wiimoteNunchukData.buttons.push_back(nunchukButtons_[0]);
+	wiimoteNunchukData.buttons.push_back(nunchukButtons_[1]);
+
+	wiimoteNunchukPub_.publish(wiimoteNunchukData);	
 }
 
 /* Check is Nunchuk connected */

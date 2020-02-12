@@ -250,13 +250,25 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 					x = -1;
 				else if (x > 1)
 					x = 1;
-				nunchukJoystick_[0] = x;
+				// Create a deadzone in the center
+				if (fabs(x) <= 0.05){
+					nunchukJoystick_[0] = 0.0;
+				}else{
+					nunchukJoystick_[0] = x;
+				}
 				
 				y = 0.01 * event.v.abs[0].y;
 				if (y < -1)
 					y = -1;
 				else if (y > 1)
 					y = 1;
+				// Create a deadzone in the center
+				if (fabs(y) <= 0.05){
+					nunchukJoystick_[1] = 0.0;
+				}else{
+					nunchukJoystick_[1] = y;
+				}
+				
 				nunchukJoystick_[1] = y;
 				
 				naccex = event.v.abs[1].x;

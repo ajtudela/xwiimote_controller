@@ -44,7 +44,7 @@ public:
 private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
-	ros::Publisher wiimoteStatePub_, joyPub_;
+	ros::Publisher wiimoteStatePub_, joyPub_, wiimoteNunchukPub_;
 	ros::Subscriber joySetFeedbackSub_;
 	ros::Time rumbleEnd_;
 	
@@ -58,12 +58,15 @@ private:
 	bool runInterface(struct xwii_iface *iface);
 	void initializeWiimoteState();
 	void publishJoy();
-	void publishState();
+	void publishWiimoteState();
+	void publishWiimoteNunchuk();
 	void readLed();
 	void readBattery();
 	void toggleRumble(bool on);
 	void setLed(unsigned int ledIdx, bool on);
 	void setRumble(double duration);
+	bool isPresentNunchuk();
+	bool isPresentMotionPlus();
 	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);	
 	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 };

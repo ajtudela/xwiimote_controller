@@ -366,7 +366,8 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		
 		if(needPub) {
 			publishJoy();		
-			publishState();
+			publishWiimoteState();
+			publishWiimoteNunchuk();
 		}
 		
 		ros::spinOnce();
@@ -468,7 +469,7 @@ void WiimoteNode::publishJoy(){
 	joyData.header.stamp = ros::Time::now();
 	
 	for(int i = 0; i < 11; i++){
-		joyData.axes.push_back(nunchuckAcceleration_[i]);
+		joyData.axes.push_back(acceleration_[i]);
 	}
 	
 	for(int i = 0; i < 11; i++){
@@ -479,17 +480,14 @@ void WiimoteNode::publishJoy(){
 }
 
 /* Publish state */
-void WiimoteNode::publishState(){
+void WiimoteNode::publishWiimoteState(){
 	xwiimote_controller::State state;
 	state.header.stamp = ros::Time::now();
 	
 	for(int i = 0; i < 11; i++){
 		state.buttons[i] = buttons_[i];
 	}
-	for(int i = 0; i < 2; i++){
-		state.nunchuk_buttons[i] = nunchukButtons_[i];
-		state.nunchuk_joystick[i] = nunchukJoystick_[i];
-	}
+	
 	for(int i = 0; i < 4; i++){
 		state.LEDs[i] = leds_[i];
 	}
@@ -498,18 +496,81 @@ void WiimoteNode::publishState(){
 	state.linear_acceleration.y = acceleration_[1];
 	state.linear_acceleration.z = acceleration_[2];
 	
-	state.nunchuk_acceleration.x = nunchuckAcceleration_[0];
-	state.nunchuk_acceleration.y = nunchuckAcceleration_[1];
-	state.nunchuk_acceleration.z = nunchuckAcceleration_[2];
+	if(isPresentNunchuk()){
+		for(int i = 0; i < 2; i++){
+			state.nunchuk_buttons[i] = nunchukButtons_[i];
+			state.nunchuk_joystick[i] = nunchukJoystick_[i];
+		}
+		state.nunchuk_acceleration.x = nunchuckAcceleration_[0];
+		state.nunchuk_acceleration.y = nunchuckAcceleration_[1];
+		state.nunchuk_acceleration.z = nunchuckAcceleration_[2];
+	}
 	
-	state.angular_velocity.x = angularVelocity_[0];
-	state.angular_velocity.y = angularVelocity_[1];
-	state.angular_velocity.z = angularVelocity_[2];
+	if(isPresentMotionPlus()){
+		state.angular_velocity.x = angularVelocity_[0];
+		state.angular_velocity.y = angularVelocity_[1];
+		state.angular_velocity.z = angularVelocity_[2];
+	}
 			
 	state.rumble = rumbleState_;
 	state.percent_battery = batteryPercent_;
 	
 	wiimoteStatePub_.publish(state);
+}
+
+/* Publish nunchuk */
+void WiimoteNode::publishWiimoteNunchuk(){
+	sensor_msgs::Joy wiimoteNunchukData;
+	
+	// Is the Nunchuk connected?
+	if(isPresentNunchuk()){
+		// Is the Nunchuk publisher not advertised?
+		if(nullptr == wiimoteNunchukPub_){
+			wiimoteNunchukPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/wiimote/nunchuk", 1);
+			
+			wiimoteNunchukData.header.stamp = ros::Time::now();
+
+			// Joy stick
+			double stick[2];
+
+			//calculateJoystickAxisXY(wiimote_state_.ext.nunchuk.stick, nunchuk_stick_min_, nunchuk_stick_max_, nunchuk_stick_center_, stick);
+
+			wiimoteNunchukData.axes.push_back(stick[0]);  // x
+			wiimoteNunchukData.axes.push_back(stick[1]);  // y
+
+			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[0]);
+			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[1]);
+			wiimoteNunchukData.axes.push_back(nunchuckAcceleration_[2]);
+
+			wiimoteNunchukData.buttons.push_back(nunchukButtons_[0]);
+			wiimoteNunchukData.buttons.push_back(nunchukButtons_[1]);
+
+			wiimoteNunchukPub_.publish(wiimoteNunchukData);			
+		}
+	}else{
+		// Is the Nunchuk publisher advertised?
+		if(nullptr != wiimoteNunchukPub_){
+			wiimoteNunchukPub_.shutdown();
+		}
+	}	
+}
+
+/* Check is Nunchuk connected */
+bool WiimoteNode::isPresentNunchuk(){	
+	if(xwii_get_iface_name(XWII_IFACE_NUNCHUK) == NULL){
+		return false;
+	}else{
+		return true;
+	}
+}
+
+/* Check is Motion plus connected */
+bool WiimoteNode::isPresentMotionPlus(){	
+	if(xwii_get_iface_name(XWII_IFACE_MOTION_PLUS) == NULL){
+		return false;
+	}else{
+		return true;
+	}
 }
 
 int main(int argc, char **argv) {

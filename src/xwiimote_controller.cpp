@@ -269,8 +269,6 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 					nunchukJoystick_[1] = y;
 				}
 				
-				nunchukJoystick_[1] = y;
-				
 				naccex = event.v.abs[1].x;
 				/*naccex /= 512;
 				if (naccex >= 0)

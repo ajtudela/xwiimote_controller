@@ -32,7 +32,8 @@
 /* Initialize the subscribers and publishers */
 WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){	
 	paramsSrv_ = nodePrivate_.advertiseService("params", &WiimoteNode::updateParams, this);
-	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1);
+	//wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1, wiimoteConnected, wiimoteDisconnected);
+	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1, boost::bind(&WiimoteNode::wiimoteConnectedCallback, this, _1), boost::bind(&WiimoteNode::wiimoteDisconnectedCallback, this, _1));
 	joyPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/joy", 1);
 	
 	joySetFeedbackSub_ = nodePrivate_.subscribe<sensor_msgs::JoyFeedbackArray>("/joy/set_feedback", 10, &WiimoteNode::joySetFeedbackCallback, this);
@@ -44,6 +45,7 @@ WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) :
 WiimoteNode::~WiimoteNode(){
 	nodePrivate_.deleteParam("device_idx");
 	nodePrivate_.deleteParam("device_path");	
+	nodePrivate_.deleteParam("wiimoteConnected");
 }
 
 /* Initialize Wiimote State */
@@ -76,8 +78,19 @@ void WiimoteNode::initializeWiimoteState(){
 bool WiimoteNode::updateParams(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
 	nodePrivate_.param<int>("device_idx", deviceIdx_, 1);
 	nodePrivate_.param<std::string>("device_path", devicePath_, "");
+	nodePrivate_.param<bool>("wiimoteConnected", wiimoteConnected_, false);
 
 	return true;
+}
+
+/* Advertise params of joystick connected */
+void WiimoteNode::wiimoteConnectedCallback(const ros::SingleSubscriberPublisher& pub){
+	nodePrivate_.setParam("wiimoteConnected", true);
+}
+
+/* Advertise params of joystick disconnected */
+void WiimoteNode::wiimoteDisconnectedCallback(const ros::SingleSubscriberPublisher& pub){
+	nodePrivate_.setParam("wiimoteConnected", false);	
 }
 
 /* Get device to connect */

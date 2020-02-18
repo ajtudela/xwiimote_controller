@@ -276,13 +276,11 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 				else if (y > 1)
 					y = 1;
 				// Create a deadzone in the center
-				if (fabs(y) <= 0.05){
+				if (fabs(y) <= 0.06){
 					nunchukJoystick_[1] = 0.0;
 				}else{
 					nunchukJoystick_[1] = y;
 				}
-				
-				nunchukJoystick_[1] = y;
 				
 				naccex = event.v.abs[1].x;
 				/*naccex /= 512;
@@ -382,10 +380,10 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		} // end switch
 
 		// Check rumble end
-		if(rumbleState_ && ros::Time::now() > rumbleEnd_) {
+		/*if(rumbleState_ && ros::Time::now() > rumbleEnd_) {
 			toggleRumble(false);
 			rumbleState_ = false;
-		}
+		}*/
 		
 		// Check leds
 		readLed();
@@ -408,6 +406,9 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 /* Toggle rumble motor */
 void WiimoteNode::toggleRumble(bool on){
 	ROS_INFO_THROTTLE(1, "rumble(%i)", on);
+	if(on) rumbleState_ = false;
+	else rumbleState_ = true;
+	
 	unsigned int ret = xwii_iface_rumble(iface_, on);
 	if (ret) {
 		ROS_ERROR("Error: Cannot toggle rumble motor: %d", ret);
@@ -436,7 +437,9 @@ void WiimoteNode::joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::Co
 				ROS_WARN("RUMBLE ID %d out of bounds; ignoring!", (*it).id);
 			}else{
 				if((*it).intensity > 0){
-					setRumble((*it).intensity);
+					toggleRumble(true);
+				}else{
+					toggleRumble(false);
 				}
 			}
 		}else{
@@ -457,7 +460,6 @@ void WiimoteNode::setRumble(double duration){
 	ROS_INFO("Duration %f", duration);
 	// start rumble
 	toggleRumble(true);
-	rumbleState_ = true;
 }
 
 /* Read leds */

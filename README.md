@@ -187,7 +187,7 @@ Subscriptions
   You have to build the array in the next way:
 	- Type of the feedback: TYPE_LED = 0 or TYPE_RUMBLE = 1.
 	- Id number for each type of each feedback. The first led would be id = 0. If rumble, id = 0.
-	- Intensity of the feedback. If rumble, intensity is duration in seconds. Given durations will be clamped in the (10 ms, 10 s) span.
+	- Intensity of the feedback as long as it would be publishing.
 
 Publications
 ------------

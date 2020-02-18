@@ -32,7 +32,6 @@
 /* Initialize the subscribers and publishers */
 WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){	
 	paramsSrv_ = nodePrivate_.advertiseService("params", &WiimoteNode::updateParams, this);
-	//wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1, wiimoteConnected, wiimoteDisconnected);
 	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("/wiimote/state", 1, boost::bind(&WiimoteNode::wiimoteConnectedCallback, this, _1), boost::bind(&WiimoteNode::wiimoteDisconnectedCallback, this, _1));
 	joyPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("/joy", 1);
 	

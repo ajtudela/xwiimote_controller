@@ -22,7 +22,6 @@
  
 #include "xwiimote_controller/xwiimote_controller.h"
 #include "xwiimote_controller/State.h"
-#include "xwiimote_controller/IrSourceInfo.h"
 
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float32.h"
@@ -84,12 +83,14 @@ bool WiimoteNode::updateParams(std_srvs::Empty::Request &req, std_srvs::Empty::R
 
 /* Advertise params of joystick connected */
 void WiimoteNode::wiimoteConnectedCallback(const ros::SingleSubscriberPublisher& pub){
-	nodePrivate_.setParam("wiimoteConnected", true);
+	//nodePrivate_.setParam("wiimoteConnected", true);
+	//ROS_INFO ("wiimoteConnectedCallback");
 }
 
 /* Advertise params of joystick disconnected */
 void WiimoteNode::wiimoteDisconnectedCallback(const ros::SingleSubscriberPublisher& pub){
-	nodePrivate_.setParam("wiimoteConnected", false);	
+	//nodePrivate_.setParam("wiimoteConnected", false);	
+	//ROS_INFO ("wiimoteDisconnectedCallback");
 }
 
 /* Get device to connect */
@@ -121,6 +122,7 @@ int WiimoteNode::openInterface(){
 		devicePath_ = getDevice(deviceIdx_);
 		if (devicePath_.empty()) {
 		  ROS_FATAL("[xwiimote]: Cannot find device %i", deviceIdx_);
+		  nodePrivate_.setParam("wiimoteConnected", false);
 		  return -1;
 		}
 	}else if(devicePath_.empty()) {
@@ -153,7 +155,7 @@ int WiimoteNode::openInterface(){
 bool WiimoteNode::runInterface(struct xwii_iface *iface){
 	struct xwii_event event;
 	int ret = 0, fds_num;
-	struct pollfd fds[2];
+	struct pollfd fds[2];	
 
 	memset(fds, 0, sizeof(fds));
 	fds[0].fd = 0;
@@ -166,6 +168,8 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		ROS_FATAL("[xwiimote]: Cannot initialize hotplug watch descriptor");
 		return false;
 	}
+	
+	nodePrivate_.setParam("wiimoteConnected", true);
 	
 	// Give the hardware time to zero the accelerometer and gyro after pairing
     // Ensure we are getting valid data before using
@@ -199,6 +203,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		switch (event.type) {
 			case XWII_EVENT_GONE:
 				ROS_WARN("[xwiimote]: Device gone");
+				nodePrivate_.setParam("wiimoteConnected", false);
 				fds[1].fd = -1;
 				fds[1].events = 0;
 				fds_num = 1;
@@ -275,7 +280,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 				else if (y > 1)
 					y = 1;
 				// Create a deadzone in the center
-				if (fabs(y) <= 0.06){
+				if (fabs(y) <= 0.07){
 					nunchukJoystick_[1] = 0.0;
 				}else{
 					nunchukJoystick_[1] = y;
@@ -498,9 +503,12 @@ void WiimoteNode::publishJoy(){
 
 	joyData.header.stamp = ros::Time::now();
 	
-	for(int i = 0; i < 11; i++){
-		joyData.axes.push_back(acceleration_[i]);
-	}
+	joyData.axes.push_back(nunchukJoystick_[0]);  // x
+	joyData.axes.push_back(nunchukJoystick_[1]);  // y
+
+	joyData.axes.push_back(nunchuckAcceleration_[0]);
+	joyData.axes.push_back(nunchuckAcceleration_[1]);
+	joyData.axes.push_back(nunchuckAcceleration_[2]);
 	
 	for(int i = 0; i < 11; i++){
 		joyData.buttons.push_back(buttons_[i]);

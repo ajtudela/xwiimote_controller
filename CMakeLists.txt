@@ -141,7 +141,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME} src/xwiimote_controller.cpp)
 target_link_libraries(xwiimote_controller ${catkin_LIBRARIES} xwiimote)
-add_dependencies(xwiimote_controller xwiimote_generate_messages_cpp)
+add_dependencies(xwiimote_controller ${PROJECT_NAME}_generate_messages_cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

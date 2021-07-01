@@ -77,7 +77,7 @@ float32[2] nunchuk_joystick
 # Mappings from Wiimote button name
 # to array position are defined above.
 #
-bool[11] buttons
+bool[15] buttons
 bool[2] nunchuk_buttons
 
 #----------------------

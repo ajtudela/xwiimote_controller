@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-	<node pkg="xwiimote_controller" type="xwiimote_controller" name="xwiimote" output="screen" respawn="true">
+	<node pkg="xwiimote_controller" type="xwiimote_controller" name="wiimote" output="screen" respawn="true">
 		<param name="device_idx" value="1"/>
 	</node>
 </launch>

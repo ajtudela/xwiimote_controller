@@ -47,15 +47,15 @@ private:
 	ros::Publisher wiimoteStatePub_, joyPub_, wiimoteNunchukPub_;
 	ros::Subscriber joySetFeedbackSub_;
 	ros::Time rumbleEnd_;
-	
+
 	int deviceIdx_;
 	std::string devicePath_;
 	struct xwii_iface *iface_;
 	bool wiimoteCalibrated_, wiimoteConnected_;
-	bool buttons_[11], nunchukButtons_[2], leds_[4], rumbleState_;
+	bool buttons_[15], nunchukButtons_[2], leds_[4], rumbleState_;
 	float batteryPercent_, nunchukJoystick_[2], nunchuckAcceleration_[3], acceleration_[3], angularVelocity_[3];
 	float accelerationCal_[3];
-	
+
 	char *getDevice(int num);
 	bool runInterface(struct xwii_iface *iface);
 	void initializeWiimoteState();
@@ -70,11 +70,11 @@ private:
 	bool isPresentNunchuk();
 	bool isPresentMotionPlus();
 	void checkFactoryCalibrationData();
-	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);	
+	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);
 	void wiimoteConnectedCallback(const ros::SingleSubscriberPublisher& pub);
 	void wiimoteDisconnectedCallback(const ros::SingleSubscriberPublisher& pub);
-	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);	
-	
+	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
+
 	// Convert wiimote accelerator readings from g's to m/sec^2:
 	const double EARTH_GRAVITY_ = 9.80665;  // m/sec^2 @sea_level
 };

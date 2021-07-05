@@ -1,6 +1,6 @@
 /*
  * ROS Node for using a wiimote control unit to direct a robot.
- * Copyright (c) 2020, Alberto Tudela.
+ * Copyright (c) 2020-2021, Alberto Tudela.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,20 +19,25 @@
  * Revisions:
  *
  */
- 
+
+#include <string>
+
 #include "xwiimote_controller/xwiimote_controller.h"
 #include "xwiimote_controller/State.h"
 
-#include "std_msgs/Bool.h"
-#include "std_msgs/Float32.h"
-#include "sensor_msgs/Joy.h"
-#include <string>
+#include <std_msgs/Bool.h>
+#include <std_msgs/Float32.h>
+#include <sensor_msgs/BatteryState.h>
+#include <sensor_msgs/Joy.h>
+
 
 /* Initialize the subscribers and publishers */
-WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){	
+WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){
 	paramsSrv_ = nodePrivate_.advertiseService("params", &WiimoteNode::updateParams, this);
-	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("state", 1, boost::bind(&WiimoteNode::wiimoteConnectedCallback, this, _1), boost::bind(&WiimoteNode::wiimoteDisconnectedCallback, this, _1));
+
+	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("state", 1);
 	joyPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("joy", 1);
+	batteryPub_ = nodePrivate_.advertise<sensor_msgs::BatteryState>("battery", 1);
 
 	joySetFeedbackSub_ = nodePrivate_.subscribe<sensor_msgs::JoyFeedbackArray>("joy/set_feedback", 10, &WiimoteNode::joySetFeedbackCallback, this);
 
@@ -43,7 +48,7 @@ WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) :
 WiimoteNode::~WiimoteNode(){
 	nodePrivate_.deleteParam("device_idx");
 	nodePrivate_.deleteParam("device_path");
-	nodePrivate_.deleteParam("wiimoteConnected");
+	nodePrivate_.deleteParam("wiimote_connected");
 }
 
 /* Initialize Wiimote State */
@@ -51,7 +56,7 @@ void WiimoteNode::initializeWiimoteState(){
 	std_srvs::Empty empt; 
 	updateParams(empt.request, empt.response);
 
-	for(int i = 0; i < 15; i++){ 
+	for(int i = 0; i < 15; i++){
 		buttons_[i] = false;
 	}
 	for(int i = 0; i < 2; i++){
@@ -76,21 +81,9 @@ void WiimoteNode::initializeWiimoteState(){
 bool WiimoteNode::updateParams(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
 	nodePrivate_.param<int>("device_idx", deviceIdx_, 1);
 	nodePrivate_.param<std::string>("device_path", devicePath_, "");
-	nodePrivate_.param<bool>("wiimoteConnected", wiimoteConnected_, false);
+	nodePrivate_.param<bool>("wiimote_connected", wiimoteConnected_, false);
 
 	return true;
-}
-
-/* Advertise params of joystick connected */
-void WiimoteNode::wiimoteConnectedCallback(const ros::SingleSubscriberPublisher& pub){
-	//nodePrivate_.setParam("wiimoteConnected", true);
-	//ROS_INFO ("wiimoteConnectedCallback");
-}
-
-/* Advertise params of joystick disconnected */
-void WiimoteNode::wiimoteDisconnectedCallback(const ros::SingleSubscriberPublisher& pub){
-	//nodePrivate_.setParam("wiimoteConnected", false);	
-	//ROS_INFO ("wiimoteDisconnectedCallback");
 }
 
 /* Get device to connect */
@@ -120,10 +113,10 @@ char *WiimoteNode::getDevice(int num){
 int WiimoteNode::openInterface(){
 	if(deviceIdx_ > 0) {
 		devicePath_ = getDevice(deviceIdx_);
-		if (devicePath_.empty()) {
-		  ROS_FATAL("[Xwiimote controller]: Cannot find device %i", deviceIdx_);
-		  nodePrivate_.setParam("wiimoteConnected", false);
-		  return -1;
+		if(devicePath_.empty()) {
+			ROS_FATAL("[Xwiimote controller]: Cannot find device %i", deviceIdx_);
+			nodePrivate_.setParam("wiimote_connected", false);
+			return -1;
 		}
 	}else if(devicePath_.empty()) {
 		ROS_FATAL("[Xwiimote controller]: You need to specify either device_idx or device_path!");
@@ -155,7 +148,7 @@ int WiimoteNode::openInterface(){
 bool WiimoteNode::runInterface(struct xwii_iface *iface){
 	struct xwii_event event;
 	int ret = 0, fds_num;
-	struct pollfd fds[2];	
+	struct pollfd fds[2];
 
 	memset(fds, 0, sizeof(fds));
 	fds[0].fd = 0;
@@ -164,12 +157,12 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 	fds[1].events = POLLIN;
 	fds_num = 2;
 
-	if (xwii_iface_watch(iface, true)) {
+	if(xwii_iface_watch(iface, true)) {
 		ROS_FATAL("[Xwiimote controller]: Cannot initialize hotplug watch descriptor");
 		return false;
 	}
 
-	nodePrivate_.setParam("wiimoteConnected", true);
+	nodePrivate_.setParam("wiimote_connected", true);
 
 	// Give the hardware time to zero the accelerometer and gyro after pairing
 	// Ensure we are getting valid data before using
@@ -203,7 +196,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 		switch (event.type) {
 			case XWII_EVENT_GONE:
 				ROS_WARN("[Xwiimote controller]: Device gone");
-				nodePrivate_.setParam("wiimoteConnected", false);
+				nodePrivate_.setParam("wiimote_connected", false);
 				fds[1].fd = -1;
 				fds[1].events = 0;
 				fds_num = 1;
@@ -497,10 +490,26 @@ void WiimoteNode::setLed(unsigned int ledIdx, bool on){
 	}
 }
 
+/* Publish battery */
+void WiimoteNode::publishBattery(){
+	sensor_msgs::BatteryState battery;
+
+	battery.header.frame_id = "wiimote";
+	battery.header.stamp = ros::Time::now();
+	battery.percentage = batteryPercent_ / 100.0;
+	battery.power_supply_status = sensor_msgs::BatteryState::POWER_SUPPLY_STATUS_DISCHARGING;
+	battery.power_supply_health = sensor_msgs::BatteryState::POWER_SUPPLY_HEALTH_UNKNOWN;
+	battery.power_supply_technology = sensor_msgs::BatteryState::POWER_SUPPLY_TECHNOLOGY_UNKNOWN;
+	battery.present = true;
+
+	batteryPub_.publish(battery);
+}
+
 /* Publish joy */
 void WiimoteNode::publishJoy(){
 	sensor_msgs::Joy joyData;
 
+	joyData.header.frame_id = "wiimote";
 	joyData.header.stamp = ros::Time::now();
 
 	joyData.axes.push_back(nunchukJoystick_[0]);  // x
@@ -520,6 +529,8 @@ void WiimoteNode::publishJoy(){
 /* Publish state */
 void WiimoteNode::publishWiimoteState(){
 	xwiimote_controller::State state;
+
+	state.header.frame_id = "wiimote";
 	state.header.stamp = ros::Time::now();
 
 	for(int i = 0; i < 15; i++){
@@ -552,13 +563,16 @@ void WiimoteNode::publishWiimoteState(){
 
 	state.rumble = rumbleState_;
 	state.percent_battery = batteryPercent_;
-	
+
 	wiimoteStatePub_.publish(state);
 }
 
 /* Publish nunchuk */
 void WiimoteNode::publishWiimoteNunchuk(){
 	sensor_msgs::Joy wiimoteNunchukData;
+
+	wiimoteNunchukData.header.frame_id = "wiimote";
+	wiimoteNunchukData.header.stamp = ros::Time::now();
 
 	// Is the Nunchuk connected?
 	if(isPresentNunchuk()){
@@ -572,8 +586,6 @@ void WiimoteNode::publishWiimoteNunchuk(){
 			wiimoteNunchukPub_.shutdown();
 		}
 	}
-
-	wiimoteNunchukData.header.stamp = ros::Time::now();
 
 	// Joy stick
 	double stick[2];
@@ -900,7 +912,7 @@ void  WiimoteNode::checkFactoryCalibrationData(){
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "xwiimote_controller");
 	ros::NodeHandle node("");
-	ros::NodeHandle node_private("~");  
+	ros::NodeHandle node_private("~");
 
 	try{
 		ROS_INFO("[Xwiimote controller]: Initializing node");

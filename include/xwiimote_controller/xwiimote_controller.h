@@ -1,6 +1,6 @@
 /*
  * ROS Node for using a wiimote control unit to direct a robot.
- * Copyright (c) 2020, Alberto Tudela.
+ * Copyright (c) 2020-2021, Alberto Tudela.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -32,9 +32,9 @@ extern "C" {
 
 // C++
 #include "ros/ros.h"
-#include "std_srvs/Empty.h"
-#include "std_msgs/Float32.h"
-#include "sensor_msgs/JoyFeedbackArray.h"
+#include <std_srvs/Empty.h>
+#include <std_msgs/Float32.h>
+#include <sensor_msgs/JoyFeedbackArray.h>
 
 class WiimoteNode{
 public:
@@ -44,7 +44,7 @@ public:
 private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
-	ros::Publisher wiimoteStatePub_, joyPub_, wiimoteNunchukPub_;
+	ros::Publisher wiimoteStatePub_, joyPub_, wiimoteNunchukPub_, batteryPub_;
 	ros::Subscriber joySetFeedbackSub_;
 	ros::Time rumbleEnd_;
 
@@ -59,6 +59,7 @@ private:
 	char *getDevice(int num);
 	bool runInterface(struct xwii_iface *iface);
 	void initializeWiimoteState();
+	void publishBattery();
 	void publishJoy();
 	void publishWiimoteState();
 	void publishWiimoteNunchuk();
@@ -71,8 +72,6 @@ private:
 	bool isPresentMotionPlus();
 	void checkFactoryCalibrationData();
 	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);
-	void wiimoteConnectedCallback(const ros::SingleSubscriberPublisher& pub);
-	void wiimoteDisconnectedCallback(const ros::SingleSubscriberPublisher& pub);
 	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
 	// Convert wiimote accelerator readings from g's to m/sec^2:

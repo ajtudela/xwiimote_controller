@@ -392,6 +392,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 			publishJoy();
 			publishWiimoteState();
 			publishWiimoteNunchuk();
+			publishBattery();
 		}
 
 		ros::spinOnce();

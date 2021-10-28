@@ -20,16 +20,18 @@
  *
  */
 
+// C++
 #include <string>
 
-#include "xwiimote_controller/xwiimote_controller.h"
-#include "xwiimote_controller/State.h"
-
+// ROS
 #include <std_msgs/Bool.h>
 #include <std_msgs/Float32.h>
 #include <sensor_msgs/BatteryState.h>
 #include <sensor_msgs/Joy.h>
 
+// Xwiimote
+#include "xwiimote_controller/State.h"
+#include "xwiimote_controller/xwiimote_controller.h"
 
 /* Initialize the subscribers and publishers */
 WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){
@@ -112,40 +114,39 @@ char *WiimoteNode::getDevice(int num){
 /* Open an interface for the wiimote */
 int WiimoteNode::openInterface(){
 	if(deviceIdx_ > 0) {
-		devicePath_ = getDevice(deviceIdx_);
+		char* dev = getDevice(deviceIdx_);
+		devicePath_ = (dev!=NULL) ? dev : "";
 		if(devicePath_.empty()) {
 			ROS_FATAL("[Xwiimote controller]: Cannot find device %i", deviceIdx_);
 			nodePrivate_.setParam("wiimote_connected", false);
+			xwii_iface_unref(iface_);
 			return -1;
 		}
 	}else if(devicePath_.empty()) {
 		ROS_FATAL("[Xwiimote controller]: You need to specify either device_idx or device_path!");
+		xwii_iface_unref(iface_);
 		return -1;
 	}
 
 	int ret = xwii_iface_new(&iface_, devicePath_.c_str());
 	if(ret){
 		ROS_FATAL("[Xwiimote controller]: Cannot create xwii_iface '%s' err:%d", devicePath_.c_str(), ret);
+		xwii_iface_unref(iface_);
 		return -1;
 	}
 
 	ret = xwii_iface_open(iface_, xwii_iface_available(iface_) | XWII_IFACE_WRITABLE);
 	if(ret) {
 		ROS_FATAL("[Xwiimote controller]: Cannot open interface: %d", ret);
+		xwii_iface_unref(iface_);
 		return -1;
 	}
 	ROS_INFO("[Xwiimote controller]: Successfully open Wiimote device '%s'", devicePath_.c_str());
-
-	ret = runInterface(iface_);
-	if (ret) {
-		ROS_FATAL("[Xwiimote controller]: Program failed; press any key to exit");
-		return -1;
-	}
-	xwii_iface_unref(iface_);
+	return 1;
 }
 
 /* Run the wiimote */
-bool WiimoteNode::runInterface(struct xwii_iface *iface){
+bool WiimoteNode::runInterface(){
 	struct xwii_event event;
 	int ret = 0, fds_num;
 	struct pollfd fds[2];
@@ -153,11 +154,11 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 	memset(fds, 0, sizeof(fds));
 	fds[0].fd = 0;
 	fds[0].events = POLLIN;
-	fds[1].fd = xwii_iface_get_fd(iface);
+	fds[1].fd = xwii_iface_get_fd(iface_);
 	fds[1].events = POLLIN;
 	fds_num = 2;
 
-	if(xwii_iface_watch(iface, true)) {
+	if(xwii_iface_watch(iface_, true)) {
 		ROS_FATAL("[Xwiimote controller]: Cannot initialize hotplug watch descriptor");
 		return false;
 	}
@@ -168,9 +169,8 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 	// Ensure we are getting valid data before using
 	sleep(1);
 
-	checkFactoryCalibrationData();
-
-	/*if (!wiimoteCalibrated_){
+	/*checkFactoryCalibrationData();
+	if (!wiimoteCalibrated_){
 		ROS_ERROR("Wiimote not usable due to calibration failure.");
 	}*/
 
@@ -187,7 +187,7 @@ bool WiimoteNode::runInterface(struct xwii_iface *iface){
 			}
 		}
 
-		ret = xwii_iface_dispatch(iface, &event, sizeof(event));
+		ret = xwii_iface_dispatch(iface_, &event, sizeof(event));
 		if (ret) {
 			if (ret != -EAGAIN)
 			ROS_ERROR("[Xwiimote controller]: Read failed with err:%d", ret);
@@ -626,20 +626,17 @@ bool WiimoteNode::isPresentMotionPlus(){
 
 /* Check an use factory calibration data */
 void  WiimoteNode::checkFactoryCalibrationData(){
+	// TODO: Improve factory calibration 
 	/*int32_t xCal, yCal, zCal, factor;
-	
+
 	xwii_iface_get_mp_normalization(iface_, &xCal, &yCal, &zCal, &factor);
-	if 
-	 
+
 	// Calibrate remote
-	
-	
 	xCal = event.v.abs[0].x + xCal;
 	yCal = event.v.abs[0].y + yCal;
 	zCal = event.v.abs[0].z + zCal;
 	xwii_iface_set_mp_normalization(iface_, xCal, yCal, zCal, factor);
-	
-	
+
 	bool result = true;
 
 	if(factor) == 0){
@@ -661,253 +658,199 @@ void  WiimoteNode::checkFactoryCalibrationData(){
 			ROS_ERROR("Wiimote Cal:: [x]:%d, [y]:%d, [z]:%d", xCal, yCal, zCal);
 		}
 	}
-	
-	
 
-  if (!getStateSample())
-  {
-    ROS_WARN("Could not read Wiimote state; nunchuk may not be calibrated if present.");
-  }
-  else
-  {
-    if (isPresentNunchuk())
-    {
-      if (wiimote_c::cwiid_get_acc_cal(wiimote_, wiimote_c::CWIID_EXT_NUNCHUK, &nunchuk_cal_) != 0)
-      {
-        if (nunchuk_calibrated_)
-        {
-          ROS_WARN("Failed to read current Nunchuk calibration data; proceeding with previous data");
-        }
-        else
-        {
-          ROS_ERROR("Failed to read Nunchuk factory calibration data");
-          result = false;
-          nunchuk_failed_calibration_ = true;
-        }
-      }
-      else
-      {
-        // If any calibration point is zero; we fail
-        if (!(nunchuk_cal_.zero[CWIID_X] && nunchuk_cal_.zero[CWIID_Y] && nunchuk_cal_.zero[CWIID_Z] &&
-            nunchuk_cal_.one[CWIID_X] && nunchuk_cal_.one[CWIID_Y] && nunchuk_cal_.one[CWIID_Z]))
-        {
-          ROS_ERROR("Some Nunchuk factory calibration data is missing; calibration failed");
-          ROS_ERROR("Nunchuk Cal:: zero[x]:%d, zero[y]:%d, zero[z]:%d,\n\tone[x]:%d, one[y]:%d, one[z]:%d",
-              nunchuk_cal_.zero[CWIID_X], nunchuk_cal_.zero[CWIID_Y], nunchuk_cal_.zero[CWIID_Z],
-              nunchuk_cal_.one[CWIID_X], nunchuk_cal_.one[CWIID_Y], nunchuk_cal_.one[CWIID_Z]);
-          result = false;
-          nunchuk_failed_calibration_ = true;
-        }
-        else
-        {
-          nunchuk_calibrated_ = true;
-          ROS_DEBUG("Nunchuk Cal:: zero[x]:%d, zero[y]:%d, zero[z]:%d,\n\tone[x]:%d, one[y]:%d, one[z]:%d",
-              nunchuk_cal_.zero[CWIID_X], nunchuk_cal_.zero[CWIID_Y], nunchuk_cal_.zero[CWIID_Z],
-              nunchuk_cal_.one[CWIID_X], nunchuk_cal_.one[CWIID_Y], nunchuk_cal_.one[CWIID_Z]);
-        }
-      }
-    }
-  }
+	if (!getStateSample()){
+		ROS_WARN("Could not read Wiimote state; nunchuk may not be calibrated if present.");
+	}else{
+		if (isPresentNunchuk()){
+			if (wiimote_c::cwiid_get_acc_cal(wiimote_, wiimote_c::CWIID_EXT_NUNCHUK, &nunchuk_cal_) != 0){
+				if (nunchuk_calibrated_){
+					ROS_WARN("Failed to read current Nunchuk calibration data; proceeding with previous data");
+				}else{
+					ROS_ERROR("Failed to read Nunchuk factory calibration data");
+					result = false;
+					nunchuk_failed_calibration_ = true;
+				}
+			}else{
+				// If any calibration point is zero; we fail
+				if (!(nunchuk_cal_.zero[CWIID_X] && nunchuk_cal_.zero[CWIID_Y] && nunchuk_cal_.zero[CWIID_Z] &&
+					nunchuk_cal_.one[CWIID_X] && nunchuk_cal_.one[CWIID_Y] && nunchuk_cal_.one[CWIID_Z])){
+					ROS_ERROR("Some Nunchuk factory calibration data is missing; calibration failed");
+					ROS_ERROR("Nunchuk Cal:: zero[x]:%d, zero[y]:%d, zero[z]:%d,\n\tone[x]:%d, one[y]:%d, one[z]:%d",
+					nunchuk_cal_.zero[CWIID_X], nunchuk_cal_.zero[CWIID_Y], nunchuk_cal_.zero[CWIID_Z],
+					nunchuk_cal_.one[CWIID_X], nunchuk_cal_.one[CWIID_Y], nunchuk_cal_.one[CWIID_Z]);
+					result = false;
+					nunchuk_failed_calibration_ = true;
+				}else{
+					nunchuk_calibrated_ = true;
+					ROS_DEBUG("Nunchuk Cal:: zero[x]:%d, zero[y]:%d, zero[z]:%d,\n\tone[x]:%d, one[y]:%d, one[z]:%d",
+					nunchuk_cal_.zero[CWIID_X], nunchuk_cal_.zero[CWIID_Y], nunchuk_cal_.zero[CWIID_Z],
+					nunchuk_cal_.one[CWIID_X], nunchuk_cal_.one[CWIID_Y], nunchuk_cal_.one[CWIID_Z]);
+				}
+			}
+		}
+	}
 
-  if (wiimote_calibrated_)
-  {
-    // Save the current reporting mode
-    uint8_t save_report_mode = wiimote_state_.rpt_mode;
+	if(wiimote_calibrated_){
+		// Save the current reporting mode
+		uint8_t save_report_mode = wiimote_state_.rpt_mode;
 
-    // Need to ensure we are collecting accelerometer
-    uint8_t new_report_mode = save_report_mode | (CWIID_RPT_ACC | CWIID_RPT_EXT);
+		// Need to ensure we are collecting accelerometer
+		uint8_t new_report_mode = save_report_mode | (CWIID_RPT_ACC | CWIID_RPT_EXT);
 
-    if (new_report_mode != save_report_mode)
-    {
-      setReportMode(new_report_mode);
-    }
+		if(new_report_mode != save_report_mode){
+			setReportMode(new_report_mode);
+		}
 
-    ROS_INFO("Collecting additional calibration data; keep wiimote stationary...");
+		ROS_INFO("Collecting additional calibration data; keep wiimote stationary...");
 
-    StatVector3d linear_acceleration_stat_old = linear_acceleration_stat_;
-    linear_acceleration_stat_.clear();
-    StatVector3d angular_velocity_stat_old = angular_velocity_stat_;
-    angular_velocity_stat_.clear();
+		StatVector3d linear_acceleration_stat_old = linear_acceleration_stat_;
+		linear_acceleration_stat_.clear();
+		StatVector3d angular_velocity_stat_old = angular_velocity_stat_;
+		angular_velocity_stat_.clear();
 
-    bool failed = false;
-    bool data_complete = false;
-    int wiimote_data_points = 0;
-    int motionplus_data_points = 0;
+		bool failed = false;
+		bool data_complete = false;
+		int wiimote_data_points = 0;
+		int motionplus_data_points = 0;
 
-    while (!failed && !data_complete)
-    {
-      if (getStateSample())
-      {
-        if (wiimote_data_points < COVARIANCE_DATA_POINTS_)
-        {
-          linear_acceleration_stat_.addData(
-              wiimote_state_.acc[CWIID_X],
-              wiimote_state_.acc[CWIID_Y],
-              wiimote_state_.acc[CWIID_Z]);
+		while(!failed && !data_complete){
+			if (getStateSample()){
+				if (wiimote_data_points < COVARIANCE_DATA_POINTS_){
+					linear_acceleration_stat_.addData(wiimote_state_.acc[CWIID_X], wiimote_state_.acc[CWIID_Y], wiimote_state_.acc[CWIID_Z]);
+					++wiimote_data_points;
+				}
 
-          ++wiimote_data_points;
-        }
+				if (isPresentMotionplus()) {
+					if (motionplus_data_points < COVARIANCE_DATA_POINTS_){
+						// ROS_DEBUG("New MotionPlus data :%03d: PHI: %04d, THETA: %04d, PSI: %04d", motionplus_data_points,
+						//     wiimote_state_.ext.motionplus.angle_rate[CWIID_PHI],
+						//     wiimote_state_.ext.motionplus.angle_rate[CWIID_THETA],
+						//     wiimote_state_.ext.motionplus.angle_rate[CWIID_PSI]);
+						angular_velocity_stat_.addData(
+						wiimote_state_.ext.motionplus.angle_rate[CWIID_PHI],
+						wiimote_state_.ext.motionplus.angle_rate[CWIID_THETA],
+						wiimote_state_.ext.motionplus.angle_rate[CWIID_PSI]);
 
-        if (isPresentMotionplus())
-        {
-          if (motionplus_data_points < COVARIANCE_DATA_POINTS_)
-          {
-            // ROS_DEBUG("New MotionPlus data :%03d: PHI: %04d, THETA: %04d, PSI: %04d", motionplus_data_points,
-            //     wiimote_state_.ext.motionplus.angle_rate[CWIID_PHI],
-            //     wiimote_state_.ext.motionplus.angle_rate[CWIID_THETA],
-            //     wiimote_state_.ext.motionplus.angle_rate[CWIID_PSI]);
-            angular_velocity_stat_.addData(
-                wiimote_state_.ext.motionplus.angle_rate[CWIID_PHI],
-                wiimote_state_.ext.motionplus.angle_rate[CWIID_THETA],
-                wiimote_state_.ext.motionplus.angle_rate[CWIID_PSI]);
+						++motionplus_data_points;
+					}
+				}
+			}else{
+				failed = true;
+			}
 
-            ++motionplus_data_points;
-          }
-        }
-      }
-      else
-      {
-        failed = true;
-      }
+			if (wiimote_data_points >= COVARIANCE_DATA_POINTS_){
+				if (!isPresentMotionplus()){
+					data_complete = true;
+				}else{
+					if (motionplus_data_points >= COVARIANCE_DATA_POINTS_){
+						data_complete = true;
+					}
+				}
+			}
+		}
 
-      if (wiimote_data_points >= COVARIANCE_DATA_POINTS_)
-      {
-        if (!isPresentMotionplus())
-        {
-          data_complete = true;
-        }
-        else
-        {
-          if (motionplus_data_points >= COVARIANCE_DATA_POINTS_)
-          {
-            data_complete = true;
-          }
-        }
-      }
-    }
+		if (!failed){
+			ROS_DEBUG("Calculating calibration data...");
 
-    if (!failed)
-    {
-      ROS_DEBUG("Calculating calibration data...");
+			// Check the standard deviations > 1.0
+			TVectorDouble stddev = linear_acceleration_stat_.getStandardDeviationRaw();
+			bool is_bad_cal = false;
+			std::for_each(std::begin(stddev), std::end(stddev), [&](const double d){
+				if (d > 1.0){
+					is_bad_cal = true;
+					ROS_DEBUG("Wiimote standard deviation > 1.0");
+				}
+			});  // NOLINT(whitespace/braces)
 
-      // Check the standard deviations > 1.0
-      TVectorDouble stddev = linear_acceleration_stat_.getStandardDeviationRaw();
-      bool is_bad_cal = false;
-      std::for_each(std::begin(stddev), std::end(stddev), [&](const double d)  // NOLINT(build/c++11)
-      {
-        if (d > 1.0)
-        {
-          is_bad_cal = true;
-          ROS_DEBUG("Wiimote standard deviation > 1.0");
-        }
-      });  // NOLINT(whitespace/braces)
+			if (!is_bad_cal){
+				TVectorDouble variance = linear_acceleration_stat_.getVarianceScaled(EARTH_GRAVITY_);
 
-      if (!is_bad_cal)
-      {
-        TVectorDouble variance = linear_acceleration_stat_.getVarianceScaled(EARTH_GRAVITY_);
+				ROS_DEBUG("Variance Scaled x: %lf, y: %lf, z: %lf", variance.at(CWIID_X),
+				variance.at(CWIID_Y), variance.at(CWIID_Z));
 
-        ROS_DEBUG("Variance Scaled x: %lf, y: %lf, z: %lf", variance.at(CWIID_X),
-            variance.at(CWIID_Y), variance.at(CWIID_Z));
+				linear_acceleration_covariance_[0] = variance.at(CWIID_X);
+				linear_acceleration_covariance_[1] = 0.0;
+				linear_acceleration_covariance_[2] = 0.0;
 
-        linear_acceleration_covariance_[0] = variance.at(CWIID_X);
-        linear_acceleration_covariance_[1] = 0.0;
-        linear_acceleration_covariance_[2] = 0.0;
+				linear_acceleration_covariance_[3] = 0.0;
+				linear_acceleration_covariance_[4] = variance.at(CWIID_Y);
+				linear_acceleration_covariance_[5] = 0.0;
 
-        linear_acceleration_covariance_[3] = 0.0;
-        linear_acceleration_covariance_[4] = variance.at(CWIID_Y);
-        linear_acceleration_covariance_[5] = 0.0;
+				linear_acceleration_covariance_[6] = 0.0;
+				linear_acceleration_covariance_[7] = 0.0;
+				linear_acceleration_covariance_[8] = variance.at(CWIID_Z);
+			}else{
+				ROS_ERROR("Failed calibration; using questionable data for linear acceleration");
 
-        linear_acceleration_covariance_[6] = 0.0;
-        linear_acceleration_covariance_[7] = 0.0;
-        linear_acceleration_covariance_[8] = variance.at(CWIID_Z);
-      }
-      else
-      {
-        ROS_ERROR("Failed calibration; using questionable data for linear acceleration");
+				linear_acceleration_stat_ = linear_acceleration_stat_old;
+				angular_velocity_stat_ = angular_velocity_stat_old;
 
-        linear_acceleration_stat_ = linear_acceleration_stat_old;
-        angular_velocity_stat_ = angular_velocity_stat_old;
+				result = false;
+			}
 
-        result = false;
-      }
+			if (angular_velocity_stat_.size() == COVARIANCE_DATA_POINTS_){
+				// Check the standard deviations > 50.0
+				TVectorDouble gyro_stddev = angular_velocity_stat_.getStandardDeviationRaw();
+				std::for_each(std::begin(gyro_stddev), std::end(gyro_stddev), [&](const double d){
+					if (d > 50.0){
+						is_bad_cal = true;
+						ROS_DEBUG("MotionPlus standard deviation > 50");
+					}
+				});  // NOLINT(whitespace/braces)
 
-      if (angular_velocity_stat_.size() == COVARIANCE_DATA_POINTS_)
-      {
-        // Check the standard deviations > 50.0
-        TVectorDouble gyro_stddev = angular_velocity_stat_.getStandardDeviationRaw();
-        std::for_each(std::begin(gyro_stddev), std::end(gyro_stddev), [&](const double d)  // NOLINT(build/c++11)
-        {
-          if (d > 50.0)
-          {
-            is_bad_cal = true;
-            ROS_DEBUG("MotionPlus standard deviation > 50");
-          }
-        });  // NOLINT(whitespace/braces)
+				if(!is_bad_cal){
+					TVectorDouble gyro_variance = angular_velocity_stat_.getVarianceScaled(GYRO_SCALE_FACTOR_);
 
-        if (!is_bad_cal)
-        {
-          TVectorDouble gyro_variance = angular_velocity_stat_.getVarianceScaled(GYRO_SCALE_FACTOR_);
+					ROS_DEBUG("Gyro Variance Scaled x: %lf, y: %lf, z: %lf", gyro_variance.at(CWIID_PHI),
+					gyro_variance.at(CWIID_THETA), gyro_variance.at(CWIID_PSI));
 
-          ROS_DEBUG("Gyro Variance Scaled x: %lf, y: %lf, z: %lf", gyro_variance.at(CWIID_PHI),
-              gyro_variance.at(CWIID_THETA), gyro_variance.at(CWIID_PSI));
+					angular_velocity_covariance_[0] = gyro_variance.at(CWIID_PHI);
+					angular_velocity_covariance_[1] = 0.0;
+					angular_velocity_covariance_[2] = 0.0;
 
-          angular_velocity_covariance_[0] = gyro_variance.at(CWIID_PHI);
-          angular_velocity_covariance_[1] = 0.0;
-          angular_velocity_covariance_[2] = 0.0;
+					angular_velocity_covariance_[3] = 0.0;
+					angular_velocity_covariance_[4] = gyro_variance.at(CWIID_THETA);
+					angular_velocity_covariance_[5] = 0.0;
 
-          angular_velocity_covariance_[3] = 0.0;
-          angular_velocity_covariance_[4] = gyro_variance.at(CWIID_THETA);
-          angular_velocity_covariance_[5] = 0.0;
+					angular_velocity_covariance_[6] = 0.0;
+					angular_velocity_covariance_[7] = 0.0;
+					angular_velocity_covariance_[8] = gyro_variance.at(CWIID_PSI);
+				}else{
+					ROS_ERROR("Failed calibration; using questionable data for angular velocity");
 
-          angular_velocity_covariance_[6] = 0.0;
-          angular_velocity_covariance_[7] = 0.0;
-          angular_velocity_covariance_[8] = gyro_variance.at(CWIID_PSI);
-        }
-        else
-        {
-          ROS_ERROR("Failed calibration; using questionable data for angular velocity");
+					angular_velocity_stat_ = angular_velocity_stat_old;
 
-          angular_velocity_stat_ = angular_velocity_stat_old;
+					result = false;
+				}
+			}else{
+			resetMotionPlusState();
+		}
+		}
 
-          result = false;
-        }
-      }
-      else
-      {
-        resetMotionPlusState();
-      }
-    }
+		if (failed){
+			ROS_ERROR("Failed calibration; using questionable data");
+			result = false;
+		}else{
+			struct timespec state_tv;
 
-    if (failed)
-    {
-      ROS_ERROR("Failed calibration; using questionable data");
-      result = false;
-    }
-    else
-    {
-      struct timespec state_tv;
+			if(clock_gettime(CLOCK_REALTIME, &state_tv) == 0){
+				calibration_time_ = ros::Time::now();
+			}else{
+				ROS_WARN("Could not update calibration time.");
+			}
+		}
 
-      if (clock_gettime(CLOCK_REALTIME, &state_tv) == 0)
-      {
-        calibration_time_ = ros::Time::now();
-      }
-      else
-      {
-        ROS_WARN("Could not update calibration time.");
-      }
-    }
+		// Restore the pre-existing reporting mode
+		if (new_report_mode != save_report_mode){
+			setReportMode(save_report_mode);
+		}
+	}
 
-    // Restore the pre-existing reporting mode
-    if (new_report_mode != save_report_mode)
-    {
-      setReportMode(save_report_mode);
-    }
-  }
-
-  // Publish the initial calibration state
-  std_msgs::Bool imu_is_calibrated_data;
-  imu_is_calibrated_data.data = result;
-  imu_is_calibrated_pub_.publish(imu_is_calibrated_data);*/
+	// Publish the initial calibration state
+	std_msgs::Bool imu_is_calibrated_data;
+	imu_is_calibrated_data.data = result;
+	imu_is_calibrated_pub_.publish(imu_is_calibrated_data);*/
 }
 
 int main(int argc, char **argv) {
@@ -918,7 +861,20 @@ int main(int argc, char **argv) {
 	try{
 		ROS_INFO("[Xwiimote controller]: Initializing node");
 		WiimoteNode wiimotenode(node, node_private);
-		wiimotenode.openInterface();
+		while (ros::ok()) {
+			int error  = wiimotenode.openInterface();
+			if(error =! -1){
+				ROS_INFO("error %i", error);
+				if(wiimotenode.runInterface()){
+					ROS_FATAL("[Xwiimote controller]: Program failed; press any key to exit");
+					return -1;
+				}
+			}else{
+				 ROS_ERROR("[Xwiimote controller]: Couldn't open wiimote. Will retry every second.");
+				 sleep(1);
+			}
+			ros::spinOnce();
+		}
 	}
 	catch(const char* s){
 		ROS_FATAL_STREAM("[Xwiimote controller]: " << s);

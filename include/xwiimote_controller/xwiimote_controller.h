@@ -33,7 +33,6 @@ extern "C" {
 // C++
 #include "ros/ros.h"
 #include <std_srvs/Empty.h>
-#include <std_msgs/Float32.h>
 #include <sensor_msgs/JoyFeedbackArray.h>
 
 class WiimoteNode{
@@ -41,6 +40,7 @@ public:
 	WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private);
 	~WiimoteNode();
 	int openInterface();
+	bool runInterface();
 private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
@@ -57,7 +57,6 @@ private:
 	float accelerationCal_[3];
 
 	char *getDevice(int num);
-	bool runInterface(struct xwii_iface *iface);
 	void initializeWiimoteState();
 	void publishBattery();
 	void publishJoy();

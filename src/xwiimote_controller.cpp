@@ -1,22 +1,11 @@
 /*
- * ROS Node for using a wiimote control unit to direct a robot.
- * Copyright (c) 2020-2021, Alberto Tudela.
+ * XWIIMOTE CONTROLLER CLASS
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- */
-
-/*
- * Initial C++ implementation by
- *  Alberto Tudela <ajtudela@gmail.com>
- *
- * Revisions:
+ * Copyright (c) 2020-2021 Alberto José Tudela Roldán <ajtudela@gmail.com>
+ * 
+ * This file is part of xwiimote_controller project.
+ * 
+ * All rights reserved.
  *
  */
 
@@ -34,30 +23,29 @@
 #include "xwiimote_controller/xwiimote_controller.h"
 
 /* Initialize the subscribers and publishers */
-WiimoteNode::WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){
-	paramsSrv_ = nodePrivate_.advertiseService("params", &WiimoteNode::updateParams, this);
+XWiimoteController::XWiimoteController(ros::NodeHandle& node, ros::NodeHandle& node_private) : node_(node), nodePrivate_(node_private){
+	// Initialize ROS parameters
+	getParams();
+
+	// Initialize Wiimote internal state
+	initializeWiimoteState();
 
 	wiimoteStatePub_ = nodePrivate_.advertise<xwiimote_controller::State>("state", 1);
 	joyPub_ = nodePrivate_.advertise<sensor_msgs::Joy>("joy", 1);
 	batteryPub_ = nodePrivate_.advertise<sensor_msgs::BatteryState>("battery", 1);
 
-	joySetFeedbackSub_ = nodePrivate_.subscribe<sensor_msgs::JoyFeedbackArray>("joy/set_feedback", 10, &WiimoteNode::joySetFeedbackCallback, this);
-
-	initializeWiimoteState();
+	joySetFeedbackSub_ = node_.subscribe<sensor_msgs::JoyFeedbackArray>("joy/set_feedback", 10, &XWiimoteController::joySetFeedbackCallback, this);
 }
 
 /* Delete all parameteres */
-WiimoteNode::~WiimoteNode(){
+XWiimoteController::~XWiimoteController(){
 	nodePrivate_.deleteParam("device_idx");
 	nodePrivate_.deleteParam("device_path");
 	nodePrivate_.deleteParam("wiimote_connected");
 }
 
 /* Initialize Wiimote State */
-void WiimoteNode::initializeWiimoteState(){
-	std_srvs::Empty empt; 
-	updateParams(empt.request, empt.response);
-
+void XWiimoteController::initializeWiimoteState(){
 	for(int i = 0; i < 15; i++){
 		buttons_[i] = false;
 	}
@@ -80,16 +68,14 @@ void WiimoteNode::initializeWiimoteState(){
 }
 
 /* Update parameters of the node */
-bool WiimoteNode::updateParams(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res){
-	nodePrivate_.param<int>("device_idx", deviceIdx_, 1);
+void XWiimoteController::getParams(){
+	nodePrivate_.param<int>("device_idx", deviceIdx_, -1);
 	nodePrivate_.param<std::string>("device_path", devicePath_, "");
 	nodePrivate_.param<bool>("wiimote_connected", wiimoteConnected_, false);
-
-	return true;
 }
 
 /* Get device to connect */
-char *WiimoteNode::getDevice(int num){
+char *XWiimoteController::getDevice(int num){
 	struct xwii_monitor *mon = xwii_monitor_new(false, false);
 	if(!mon){
 		ROS_WARN("[Xwiimote controller]: Cannot create monitor");
@@ -99,54 +85,51 @@ char *WiimoteNode::getDevice(int num){
 	char *ent;
 	int i = 0;
 	while ((ent = xwii_monitor_poll(mon))) {
-		if (++i == num)
-			break;
+		if (++i == num) break;
 		free(ent);
 	}
 
 	xwii_monitor_unref(mon);
-	if (!ent)
-		ROS_WARN("[Xwiimote controller]: Cannot find device with number #%d", num);
-
+	if (!ent){
+		ROS_WARN_ONCE("[Xwiimote controller]: Cannot find device with number #%d", num);
+	}
 	return ent;
 }
 
 /* Open an interface for the wiimote */
-int WiimoteNode::openInterface(){
-	if(deviceIdx_ > 0) {
+int XWiimoteController::openInterface(){
+	if(deviceIdx_ > 0){
 		char* dev = getDevice(deviceIdx_);
-		devicePath_ = (dev!=NULL) ? dev : "";
-		if(devicePath_.empty()) {
-			ROS_FATAL("[Xwiimote controller]: Cannot find device %i", deviceIdx_);
-			nodePrivate_.setParam("wiimote_connected", false);
-			xwii_iface_unref(iface_);
+		devicePath_ = (dev != NULL) ? dev : "";
+		if(devicePath_.empty()){
+			ROS_FATAL_ONCE("[Xwiimote controller]: Cannot find device %i", deviceIdx_);
 			return -1;
 		}
-	}else if(devicePath_.empty()) {
-		ROS_FATAL("[Xwiimote controller]: You need to specify either device_idx or device_path!");
-		xwii_iface_unref(iface_);
-		return -1;
+	}else{
+		if(devicePath_.empty()) {
+			ROS_FATAL_ONCE("[Xwiimote controller]: You need to specify either device_idx or device_path!");
+			return -1;
+		}
 	}
 
 	int ret = xwii_iface_new(&iface_, devicePath_.c_str());
 	if(ret){
-		ROS_FATAL("[Xwiimote controller]: Cannot create xwii_iface '%s' err:%d", devicePath_.c_str(), ret);
-		xwii_iface_unref(iface_);
+		ROS_FATAL_ONCE("[Xwiimote controller]: Cannot create xwii_iface '%s' err:%d", devicePath_.c_str(), ret);
 		return -1;
 	}
 
 	ret = xwii_iface_open(iface_, xwii_iface_available(iface_) | XWII_IFACE_WRITABLE);
-	if(ret) {
-		ROS_FATAL("[Xwiimote controller]: Cannot open interface: %d", ret);
-		xwii_iface_unref(iface_);
+	if(ret){
+		ROS_FATAL_ONCE("[Xwiimote controller]: Cannot open interface: %d", ret);
 		return -1;
 	}
+
 	ROS_INFO("[Xwiimote controller]: Successfully open Wiimote device '%s'", devicePath_.c_str());
 	return 1;
 }
 
 /* Run the wiimote */
-bool WiimoteNode::runInterface(){
+int XWiimoteController::runInterface(){
 	struct xwii_event event;
 	int ret = 0, fds_num;
 	struct pollfd fds[2];
@@ -396,13 +379,18 @@ bool WiimoteNode::runInterface(){
 		}
 
 		ros::spinOnce();
-	} // end while ros::ok
+	}
 
 	return ret;
 }
 
+/* Close interface */
+void XWiimoteController::closeInterface(){
+	xwii_iface_unref(iface_);
+}
+
 /* Toggle rumble motor */
-void WiimoteNode::toggleRumble(bool on){
+void XWiimoteController::toggleRumble(bool on){
 	ROS_INFO_THROTTLE(1, "rumble(%i)", on);
 	if(on) rumbleState_ = false;
 	else rumbleState_ = true;
@@ -414,7 +402,7 @@ void WiimoteNode::toggleRumble(bool on){
 }
 
 /* Set rumble and leds */
-void WiimoteNode::joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback){
+void XWiimoteController::joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback){
 	for (std::vector<sensor_msgs::JoyFeedback>::const_iterator it = feedback->array.begin(); it != feedback->array.end(); ++it){
 		if ((*it).type == sensor_msgs::JoyFeedback::TYPE_LED){
 			if((*it).intensity >= 0.5){
@@ -447,7 +435,7 @@ void WiimoteNode::joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::Co
 }
 
 /* Set rumble for duration in seconds */
-void WiimoteNode::setRumble(double duration){
+void XWiimoteController::setRumble(double duration){
 	// compute rumbleEnd
 	if(duration < 1E-2){
 		duration = 1E-2;
@@ -461,7 +449,7 @@ void WiimoteNode::setRumble(double duration){
 }
 
 /* Read leds */
-void WiimoteNode::readLed(){
+void XWiimoteController::readLed(){
 	bool stateLed;
 	for(int i = 0; i < 4; i++){
 		unsigned int ret = xwii_iface_get_led(iface_, XWII_LED(i+1), &stateLed);
@@ -473,7 +461,7 @@ void WiimoteNode::readLed(){
 }
 
 /* Read battery percent */
-void WiimoteNode::readBattery(){
+void XWiimoteController::readBattery(){
 	uint8_t capacity;
 	unsigned int ret = xwii_iface_get_battery(iface_, &capacity);
 	batteryPercent_ = (float)capacity;
@@ -483,7 +471,7 @@ void WiimoteNode::readBattery(){
 }
 
 /* Set Leds */
-void WiimoteNode::setLed(unsigned int ledIdx, bool on){
+void XWiimoteController::setLed(unsigned int ledIdx, bool on){
 	ROS_INFO_THROTTLE(1, "led(led #%i: %i)", XWII_LED(ledIdx+1), on);
 	unsigned int ret = xwii_iface_set_led(iface_, XWII_LED(ledIdx+1),on);
 	if (ret) {
@@ -492,7 +480,7 @@ void WiimoteNode::setLed(unsigned int ledIdx, bool on){
 }
 
 /* Publish battery */
-void WiimoteNode::publishBattery(){
+void XWiimoteController::publishBattery(){
 	sensor_msgs::BatteryState battery;
 
 	battery.header.frame_id = "wiimote";
@@ -507,7 +495,7 @@ void WiimoteNode::publishBattery(){
 }
 
 /* Publish joy */
-void WiimoteNode::publishJoy(){
+void XWiimoteController::publishJoy(){
 	sensor_msgs::Joy joyData;
 
 	joyData.header.frame_id = "wiimote";
@@ -528,7 +516,7 @@ void WiimoteNode::publishJoy(){
 }
 
 /* Publish state */
-void WiimoteNode::publishWiimoteState(){
+void XWiimoteController::publishWiimoteState(){
 	xwiimote_controller::State state;
 
 	state.header.frame_id = "wiimote";
@@ -569,7 +557,7 @@ void WiimoteNode::publishWiimoteState(){
 }
 
 /* Publish nunchuk */
-void WiimoteNode::publishWiimoteNunchuk(){
+void XWiimoteController::publishWiimoteNunchuk(){
 	sensor_msgs::Joy wiimoteNunchukData;
 
 	wiimoteNunchukData.header.frame_id = "wiimote";
@@ -607,7 +595,7 @@ void WiimoteNode::publishWiimoteNunchuk(){
 }
 
 /* Check is Nunchuk connected */
-bool WiimoteNode::isPresentNunchuk(){
+bool XWiimoteController::isPresentNunchuk(){
 	if(xwii_get_iface_name(XWII_IFACE_NUNCHUK) == NULL){
 		return false;
 	}else{
@@ -616,7 +604,7 @@ bool WiimoteNode::isPresentNunchuk(){
 }
 
 /* Check is Motion plus connected */
-bool WiimoteNode::isPresentMotionPlus(){
+bool XWiimoteController::isPresentMotionPlus(){
 	if(xwii_get_iface_name(XWII_IFACE_MOTION_PLUS) == NULL){
 		return false;
 	}else{
@@ -625,7 +613,7 @@ bool WiimoteNode::isPresentMotionPlus(){
 }
 
 /* Check an use factory calibration data */
-void  WiimoteNode::checkFactoryCalibrationData(){
+void XWiimoteController::checkFactoryCalibrationData(){
 	// TODO: Improve factory calibration 
 	/*int32_t xCal, yCal, zCal, factor;
 
@@ -860,21 +848,22 @@ int main(int argc, char **argv) {
 
 	try{
 		ROS_INFO("[Xwiimote controller]: Initializing node");
-		WiimoteNode wiimotenode(node, node_private);
-		while (ros::ok()) {
-			int error  = wiimotenode.openInterface();
-			if(error =! -1){
-				ROS_INFO("error %i", error);
-				if(wiimotenode.runInterface()){
-					ROS_FATAL("[Xwiimote controller]: Program failed; press any key to exit");
+		XWiimoteController wiimotenode(node, node_private);
+		while(ros::ok()){
+			int ret = wiimotenode.openInterface();
+			if(ret){
+				ROS_ERROR_ONCE("[Xwiimote controller]: Couldn't open wiimote. Will retry every second.");
+				sleep(1);
+			}else{
+				int ret = wiimotenode.runInterface();
+				if(ret){
+					ROS_FATAL("[Xwiimote controller]: Program failed.");
 					return -1;
 				}
-			}else{
-				 ROS_ERROR("[Xwiimote controller]: Couldn't open wiimote. Will retry every second.");
-				 sleep(1);
 			}
 			ros::spinOnce();
 		}
+		wiimotenode.closeInterface();
 	}
 	catch(const char* s){
 		ROS_FATAL_STREAM("[Xwiimote controller]: " << s);

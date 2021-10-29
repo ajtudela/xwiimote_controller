@@ -1,22 +1,11 @@
 /*
- * ROS Node for using a wiimote control unit to direct a robot.
- * Copyright (c) 2020-2021, Alberto Tudela.
+ * XWIIMOTE CONTROLLER CLASS
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- */
-
-/*
- * Initial C++ implementation by
- *  Alberto Tudela <ajtudela@gmail.com>
- *
- * Revisions:
+ * Copyright (c) 2020-2021 Alberto José Tudela Roldán <ajtudela@gmail.com>
+ * 
+ * This file is part of xwiimote_controller project.
+ * 
+ * All rights reserved.
  *
  */
 
@@ -31,16 +20,16 @@ extern "C" {
 }
 
 // C++
-#include "ros/ros.h"
-#include <std_srvs/Empty.h>
+#include <ros/ros.h>
 #include <sensor_msgs/JoyFeedbackArray.h>
 
-class WiimoteNode{
+class XWiimoteController{
 public:
-	WiimoteNode(ros::NodeHandle& node, ros::NodeHandle& node_private);
-	~WiimoteNode();
+	XWiimoteController(ros::NodeHandle& node, ros::NodeHandle& node_private);
+	~XWiimoteController();
 	int openInterface();
-	bool runInterface();
+	int runInterface();
+	void closeInterface();
 private:
 	ros::NodeHandle node_, nodePrivate_;
 	ros::ServiceServer paramsSrv_;
@@ -56,12 +45,16 @@ private:
 	float batteryPercent_, nunchukJoystick_[2], nunchuckAcceleration_[3], acceleration_[3], angularVelocity_[3];
 	float accelerationCal_[3];
 
-	char *getDevice(int num);
-	void initializeWiimoteState();
+	void getParams();
+	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);
 	void publishBattery();
 	void publishJoy();
 	void publishWiimoteState();
 	void publishWiimoteNunchuk();
+
+	// Xwiimote related
+	char *getDevice(int num);
+	void initializeWiimoteState();
 	void readLed();
 	void readBattery();
 	void toggleRumble(bool on);
@@ -70,8 +63,6 @@ private:
 	bool isPresentNunchuk();
 	bool isPresentMotionPlus();
 	void checkFactoryCalibrationData();
-	void joySetFeedbackCallback(const sensor_msgs::JoyFeedbackArray::ConstPtr& feedback);
-	bool updateParams(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res);
 
 	// Convert wiimote accelerator readings from g's to m/sec^2:
 	const double EARTH_GRAVITY_ = 9.80665;  // m/sec^2 @sea_level

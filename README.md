@@ -6,7 +6,7 @@
 
 This package is designed to control a robot with a Nintendo [Wiimote] remote w/o nunchuck using the new driver xwiimote.
 
-The official * [ROS wiimote] * package is based on the [CWiiD library] and only works with older Wiimotes (*Nintendo RVL-CNT-01*). This package is based on the newer [xwiimote] and is also compatible with newer Wiimotes (`Nintendo RVL-CNT-01-TR`) and Nunchuks.
+The official *[ROS wiimote]* package is based on the [CWiiD library] and only works with older Wiimotes (*Nintendo RVL-CNT-01*). This package is based on the newer [xwiimote] and is also compatible with newer Wiimotes (`Nintendo RVL-CNT-01-TR`) and Nunchuks.
 
 **Keywords:** ROS, Nintendo, Wiimote, xwiimote
 
@@ -209,9 +209,11 @@ Control the Nintendo Wiimmote.
 	Leaves empty (`""`) to skip this parameter, in this case you need to specify the device index with `~device_idx`.
 
 
+[Ubuntu]: https://ubuntu.com/
+[ROS]: http://www.ros.org
 [Wiimote]: https://www.nintendo.es/Wii/Accesorios/Accesorios-Wii-Nintendo-Ib-eacute-rica-626430.html
 [ROS wiimote]: http://wiki.ros.org/wiimote
-[CWiiD library] https://help.ubuntu.com/community/CWiiD
+[CWiiD library]: https://help.ubuntu.com/community/CWiiD
 [xwiimote]: https://dvdhrm.github.io/xwiimote/
 [sensor_msgs/JoyFeedbackArray]: http://docs.ros.org/api/sensor_msgs/html/msg/JoyFeedbackArray.html
 [sensor_msgs/Joy]: http://docs.ros.org/api/sensor_msgs/html/msg/Joy.html

@@ -72,8 +72,9 @@ install(DIRECTORY include/${PROJECT_NAME}/
    FILES_MATCHING PATTERN "*.h"
    PATTERN ".svn" EXCLUDE
 )
+
+## Mark launch files for installation
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-  PATTERN ".svn" EXCLUDE
+  FILES_MATCHING PATTERN "*.launch"
 )
-

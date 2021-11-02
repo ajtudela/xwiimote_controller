@@ -124,8 +124,8 @@ int XWiimoteController::openInterface(){
 		return -1;
 	}
 
-	ROS_INFO("[Xwiimote controller]: Successfully open Wiimote device '%s'", devicePath_.c_str());
-	return 1;
+	ROS_INFO_ONCE("[Xwiimote controller]: Successfully open Wiimote device '%s'", devicePath_.c_str());
+	return 0;
 }
 
 /* Run the wiimote */
